@@ -1,5 +1,6 @@
 import requests
 import json
+import time
 
 def save_address_with_nominatim(address):
     url = "https://nominatim.openstreetmap.org/search"
@@ -26,17 +27,39 @@ def save_address_with_nominatim(address):
                 "city": address_details.get("city") or address_details.get("town") or address_details.get("village") or address_details.get("state"),
                 "street": address_details.get("road") or address_details.get("street")
             }
+            return result
         else:
-            result = "failed"
+            return None
     except Exception:
-        result = "failed"
-    
-    with open("nominatim_result.json", "w", encoding="utf-8") as f:
-        json.dump(result, f, ensure_ascii=False, indent=2)
-    
-    print("Result saved to nominatim_result.json")
-    return result
+        return None
 
 if __name__ == "__main__":
-    address = "Regency Palace Hotel, Tarsheeha Street, Amman, Amman Sub-District, Amman Qasabah District, Amman, 11187, Jordan"
-    save_address_with_nominatim(address)
+    with open("addresses.json", "r", encoding="utf-8") as f:
+        addresses_data = json.load(f)
+    
+    results = {}
+    
+    for country, addresses in addresses_data.items():
+        if not addresses:
+            continue
+        
+        country_results = []
+        for addr_obj in addresses:
+            address = addr_obj.get("address", "")
+            result = save_address_with_nominatim(address)
+            
+            if result and result.get("display_name"):
+                country_results.append(result)
+                print(f"Saved: {address[:50]}...")
+            else:
+                print(f"Skipped (no result): {address[:50]}...")
+            
+            time.sleep(1)  # Respect Nominatim rate limit
+        
+        if country_results:
+            results[country] = country_results
+    
+    with open("nominatim_result.json", "w", encoding="utf-8") as f:
+        json.dump(results, f, ensure_ascii=False, indent=2)
+    
+    print("\nResults saved to nominatim_result.json")
